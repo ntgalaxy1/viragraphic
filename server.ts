@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+// @ts-ignore
 import archiver from 'archiver';
 
 const execPromise = promisify(exec);
@@ -347,7 +348,7 @@ app.get('/api/export/project-zip', (req, res) => {
     zlib: { level: 9 },
   });
 
-  archive.on('error', (err) => {
+  archive.on('error', (err: any) => {
     console.error('Archiver error:', err);
     if (!res.headersSent) {
       res.status(500).send({ error: err.message });
