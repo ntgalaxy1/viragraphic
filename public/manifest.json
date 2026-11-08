@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "ویراگرافیک | Viragraphy",
+  "short_name": "ویراگرافیک",
+  "description": "سامانه پذیرش سفارش طراحی گرافیک ویراگرافیک، اتصال به تلگرام، بررسی فنی، پیش‌نمایش طرح و تحویل آنلاین",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#7c3aed",
+  "background_color": "#0a0714",
+  "icons": [
+    {
+      "src": "/assets/aistudio/IMG_20260627_085532_572_246980ce.jpg",
+      "sizes": "720x720",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
+  ]
+}

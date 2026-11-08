@@ -1,0 +1,6 @@
+{
+  "name": "ArtLine Studio - پلتفرم سفارش طراحی گرافیک و ربات تلگرام",
+  "description": "سامانه جامع پذیرش و مدیریت سفارش‌های طراحی گرافیک، اتصال به ربات تلگرام، پیش‌نمایش طرح‌ها، پرداخت آنلاین و پیگیری لحظه‌ای",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

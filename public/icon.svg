@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="artGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="50%" stop-color="#ea580c" />
+      <stop offset="100%" stop-color="#dc2626" />
+    </linearGradient>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)" />
+  <rect x="16" y="16" width="480" height="480" rx="112" stroke="#334155" stroke-width="4" stroke-opacity="0.4" />
+  
+  <!-- Pen Tool & Geometric Graphic Studio Icon -->
+  <path d="M256 96L376 336H288L256 264L224 336H136L256 96Z" fill="url(#artGrad)" />
+  <circle cx="256" cy="208" r="18" fill="#0f172a" />
+  <path d="M196 384L256 424L316 384H196Z" fill="#f59e0b" />
+  
+  <!-- Telegram & Studio Accent Wave -->
+  <path d="M160 440C220 452 292 452 352 440" stroke="#f59e0b" stroke-width="12" stroke-linecap="round" />
+</svg>

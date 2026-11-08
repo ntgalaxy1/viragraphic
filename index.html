@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>ویراگرافیک | سامانه سفارش طراحی گرافیک و ربات تلگرام</title>
+    <meta name="description" content="ویراگرافیک (Viragraphy) - سامانه جامع پذیرش و مدیریت سفارش‌های طراحی گرافیک، متصل به ربات تلگرام، پیش‌نمایش طرح‌ها، پرداخت آنلاین و پیگیری لحظه‌ای" />
+    <meta property="og:title" content="ویراگرافیک (Viragraphy) - پلتفرم طراحی گرافیک و ربات تلگرام" />
+    <meta property="og:description" content="سامانه جامع پذیرش و مدیریت سفارش‌های طراحی گرافیک، متصل به ربات تلگرام، پیش‌نمایش طرح‌ها، پرداخت آنلاین و پیگیری لحظه‌ای" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    
+    <!-- PWA meta tags -->
+    <meta name="theme-color" content="#7c3aed" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Viragraphy" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/jpeg" href="/assets/aistudio/IMG_20260627_085532_572_246980ce.jpg" />
+    <link rel="apple-touch-icon" href="/assets/aistudio/IMG_20260627_085532_572_246980ce.jpg" />
+
+    <!-- Telegram WebApp Script support (loads gracefully if inside Telegram) -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- Suppress harmless WebSocket/HMR transport errors in AI Studio iframe -->
+    <script>
+      window.addEventListener('error', function(e) {
+        var msg = (e && e.message) ? String(e.message) : '';
+        var src = (e && e.filename) ? String(e.filename) : '';
+        if (msg.includes('WebSocket') || msg.includes('@vite/client') || src.includes('@vite/client')) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+        }
+      }, true);
+      window.addEventListener('unhandledrejection', function(e) {
+        var reason = (e && e.reason) ? String(e.reason) : '';
+        if (reason.includes('WebSocket') || reason.includes('@vite/client')) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+        }
+      }, true);
+    </script>
+
+    <!-- Google Fonts: Vazirmatn for Persian & Plus Jakarta Sans for Latin -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Vazirmatn:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-[#0a0714] text-slate-100 antialiased font-sans selection:bg-violet-500 selection:text-white min-h-screen">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
