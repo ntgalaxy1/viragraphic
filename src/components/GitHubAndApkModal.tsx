@@ -37,7 +37,7 @@ export const GitHubAndApkModal: React.FC<GitHubAndApkModalProps> = ({
   );
 
   // GitHub Form state
-  const [repoUrl, setRepoUrl] = useState('https://github.com/nasertavakkoliii/viragraphy.git');
+  const [repoUrl, setRepoUrl] = useState('https://github.com/ntgalaxy1/viragraphic.git');
   const [githubToken, setGithubToken] = useState('');
   const [commitMessage, setCommitMessage] = useState(
     'Initial upload: Viragraphy Graphic Platform, Telegram Bot & Android TWA'
