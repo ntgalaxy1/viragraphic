@@ -2,10 +2,11 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
+import { createRequire } from 'module';
 import { promisify } from 'util';
-// @ts-ignore
-import archiver from 'archiver';
 
+const require = createRequire(import.meta.url);
+const { ZipArchive } = require('archiver');
 const execPromise = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
@@ -344,7 +345,7 @@ app.get('/api/export/project-zip', (req, res) => {
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', 'attachment; filename="viragraphy-source-code.zip"');
 
-  const archive = archiver('zip', {
+  const archive = new ZipArchive({
     zlib: { level: 9 },
   });
 
