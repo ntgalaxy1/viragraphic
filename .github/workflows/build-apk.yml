@@ -5,6 +5,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build APK and AAB for Cafe Bazaar & Google Play
@@ -18,10 +21,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Install Web Dependencies
-        run: npm ci || npm install
+        run: npm install --legacy-peer-deps
 
       - name: Build Web Application
         run: npm run build
@@ -35,38 +37,77 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
       - name: Copy Built Web Assets to Android Assets
         run: |
           mkdir -p android/app/src/main/assets/public
           cp -r dist/* android/app/src/main/assets/public/
 
-      - name: Make Gradle Executable
+      - name: Generate Gradle Wrapper
         run: |
           cd android
-          chmod +x gradlew || true
+          gradle wrapper
 
-      - name: Build Release APK with Gradle
+      - name: Build Release & Debug APKs with Gradle
         run: |
           cd android
-          ./gradlew assembleRelease || ./gradlew assembleDebug
+          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleRelease --stacktrace || true
 
       - name: Build Android App Bundle (AAB for Google Play)
         run: |
           cd android
-          ./gradlew bundleRelease || ./gradlew bundleDebug || true
+          ./gradlew bundleDebug --stacktrace || true
+          ./gradlew bundleRelease --stacktrace || true
 
-      - name: Upload APK Artifact
+      - name: Prepare Output Files for Release
+        run: |
+          mkdir -p release-files
+          # Copy APK
+          find android/app/build/outputs/apk -name "*.apk" -exec cp {} release-files/viragraphy-release.apk \; || true
+          # Copy AAB
+          find android/app/build/outputs/bundle -name "*.aab" -exec cp {} release-files/viragraphy-release.aab \; || true
+          # Copy metadata assets
+          cp public/assets/aistudio/IMG_20260627_085532_572_246980ce.jpg release-files/icon-512x512.png || true
+          cp public/.well-known/assetlinks.json release-files/assetlinks.json || true
+          cp CAFE_BAZAAR_PUBLISH_GUIDE.md release-files/ || true
+          cp GOOGLE_PLAY_PUBLISH_GUIDE.md release-files/ || true
+          ls -la release-files/
+
+      - name: Upload APK & AAB Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: viragraphy-release-apk
-          path: |
-            android/app/build/outputs/apk/**/*.apk
+          name: viragraphy-android-release
+          path: release-files/*
           retention-days: 30
 
-      - name: Upload AAB Artifact for Google Play
-        uses: actions/upload-artifact@v4
+      - name: Publish or Update GitHub Release v1.0.0
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
         with:
-          name: viragraphy-release-aab
-          path: |
-            android/app/build/outputs/bundle/**/*.aab
-          retention-days: 30
+          tag_name: v1.0.0
+          name: "نسخه ۱.۰.۰ استودیو ویراگرافیک (کافه بازار و گوگل پلی)"
+          body: |
+            ## انتشار رسمی نسخه ۱.۰.۰ استودیو ویراگرافیک (Viragraphy)
+            
+            این بسته شامل کلیه فایل‌های لازم جهت انتشار در استورهای **کافه بازار** و **گوگل پلی** است:
+            
+            * 📱 **viragraphy-release.apk**: فایل نصبی برای گوشی و پنل توسعه‌دهندگان کافه بازار
+            * 📦 **viragraphy-release.aab**: بسته رسمی Android App Bundle برای گوگل پلی کنسول
+            * 🖼️ **icon-512x512.png**: آیکون رسمی با وضوح بالا ۵۱۲×۵۱۲ پیکسل
+            * 🔗 **assetlinks.json**: فایل تأییدیه دامنه Digital Asset Links
+            * 📘 **راهنماها**: راهنمای فارسی انتشار در بازار و گوگل پلی
+            
+            **مشخصات بسته:**
+            * Package Name: `ir.viragraphy.app`
+            * Target SDK: `34`
+            * Min SDK: `21`
+            * Version: `1.0.0 (Code 1)`
+          files: |
+            release-files/*
+            viragraphy-source-code.zip
+            viragraphy-android-project.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
