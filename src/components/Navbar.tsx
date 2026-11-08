@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   Plus, User, ShieldCheck, Send, Smartphone, Lock, UserPlus, 
-  Layers, Palette, ClipboardList 
+  Layers, Palette, ClipboardList, Github, Download
 } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
 import { UserProfile } from '../types';
@@ -19,6 +19,7 @@ interface NavbarProps {
   onToggleViewMode: (mode: 'desktop' | 'mobile_pwa' | 'telegram_app') => void;
   ordersCount: number;
   isAdminAuthenticated?: boolean;
+  onOpenGitHubModal?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -32,6 +33,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleViewMode,
   ordersCount,
   isAdminAuthenticated = false,
+  onOpenGitHubModal,
 }) => {
   return (
     <>
@@ -156,6 +158,20 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div className="hidden sm:block">
                 <PWAInstallButton />
               </div>
+
+              {/* GitHub & APK Modal Button */}
+              {onOpenGitHubModal && (
+                <button
+                  type="button"
+                  onClick={onOpenGitHubModal}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-violet-700/60 bg-[#160f33] hover:bg-violet-900/40 text-violet-200 text-xs font-semibold transition cursor-pointer shrink-0 shadow-xs active:scale-95"
+                  title="اتصال به گیت‌هاب و خروجی APK برای گوگل پلی و بازار"
+                >
+                  <Github className="w-3.5 h-3.5 text-violet-400" />
+                  <span className="hidden sm:inline">گیت‌هاب و APK</span>
+                  <span className="sm:hidden text-[10px]">APK</span>
+                </button>
+              )}
 
               {/* Customer Registration / Profile Button */}
               <button

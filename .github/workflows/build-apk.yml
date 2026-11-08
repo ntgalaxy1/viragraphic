@@ -1,0 +1,72 @@
+name: Build Viragraphy Android APK & AAB
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build APK and AAB for Cafe Bazaar & Google Play
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Web Dependencies
+        run: npm ci || npm install
+
+      - name: Build Web Application
+        run: npm run build
+
+      - name: Setup Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Copy Built Web Assets to Android Assets
+        run: |
+          mkdir -p android/app/src/main/assets/public
+          cp -r dist/* android/app/src/main/assets/public/
+
+      - name: Make Gradle Executable
+        run: |
+          cd android
+          chmod +x gradlew || true
+
+      - name: Build Release APK with Gradle
+        run: |
+          cd android
+          ./gradlew assembleRelease || ./gradlew assembleDebug
+
+      - name: Build Android App Bundle (AAB for Google Play)
+        run: |
+          cd android
+          ./gradlew bundleRelease || ./gradlew bundleDebug || true
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: viragraphy-release-apk
+          path: |
+            android/app/build/outputs/apk/**/*.apk
+          retention-days: 30
+
+      - name: Upload AAB Artifact for Google Play
+        uses: actions/upload-artifact@v4
+        with:
+          name: viragraphy-release-aab
+          path: |
+            android/app/build/outputs/bundle/**/*.aab
+          retention-days: 30

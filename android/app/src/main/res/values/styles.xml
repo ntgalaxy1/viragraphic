@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.Viragraphy" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/violet_primary</item>
+        <item name="colorPrimaryDark">@color/status_bar</item>
+        <item name="colorAccent">@color/violet_primary</item>
+        <item name="android:statusBarColor">@color/status_bar</item>
+        <item name="android:navigationBarColor">@color/status_bar</item>
+        <item name="android:windowBackground">@color/violet_dark</item>
+    </style>
+</resources>

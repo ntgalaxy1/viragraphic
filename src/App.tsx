@@ -8,6 +8,7 @@ import { AdminLoginModal } from './components/AdminLoginModal';
 import { CustomerAuthModal } from './components/CustomerAuthModal';
 import { TelegramBotModal } from './components/TelegramBotModal';
 import { PortfolioShowcase } from './components/PortfolioShowcase';
+import { GitHubAndApkModal } from './components/GitHubAndApkModal';
 import { ToastNotification, ToastMessage } from './components/ToastNotification';
 import { INITIAL_USERS, SOCIAL_NETWORK_OPTIONS, VIRAGRAPHY_LOGO } from './data/initialData';
 import { CategoryId, ContactMethod, Project, TelegramConfig, UserProfile } from './types';
@@ -51,6 +52,7 @@ export default function App() {
   // Modals
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
   const [paymentProject, setPaymentProject] = useState<Project | null>(null);
+  const [isGitHubModalOpen, setIsGitHubModalOpen] = useState(false);
 
   // View Mode: 'desktop' | 'mobile_pwa' | 'telegram_app'
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile_pwa' | 'telegram_app'>('desktop');
@@ -697,6 +699,7 @@ export default function App() {
         onToggleViewMode={setViewMode}
         ordersCount={projects.length}
         isAdminAuthenticated={isAdminAuthenticated}
+        onOpenGitHubModal={() => setIsGitHubModalOpen(true)}
       />
 
       {/* Main Content Area with safe bottom clearance for mobile nav */}
@@ -942,6 +945,7 @@ export default function App() {
               setCurrentTab('orders');
             }}
             onLogout={handleAdminLogout}
+            onOpenGitHubModal={() => setIsGitHubModalOpen(true)}
           />
         )}
 
@@ -1015,6 +1019,12 @@ export default function App() {
         isOpen={isAdminLoginModalOpen}
         onSuccess={handleAdminLoginSuccess}
         onCancel={() => setIsAdminLoginModalOpen(false)}
+      />
+
+      {/* GitHub 0-100 Upload & Android APK (Cafe Bazaar / Google Play) Modal */}
+      <GitHubAndApkModal
+        isOpen={isGitHubModalOpen}
+        onClose={() => setIsGitHubModalOpen(false)}
       />
 
       {/* Real-time Toast Notifications */}

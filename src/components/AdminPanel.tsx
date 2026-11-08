@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   ShieldCheck, Clock, CheckCircle2, Send, Phone, Globe, Upload, 
   FileCheck, AlertCircle, ArrowUpRight, Search, Filter, Eye, RefreshCw,
-  LogOut, Lock
+  LogOut, Lock, Github, UploadCloud, FolderArchive
 } from 'lucide-react';
 import { ContactMethod, Project, ProjectStatus, UserProfile } from '../types';
 import { formatToman, getCurrentShamsiDateTime, getStatusLabel } from '../utils/formatters';
@@ -24,6 +24,7 @@ interface AdminPanelProps {
   onDeliverFinalFiles: (projectId: string) => void;
   onSelectProject: (project: Project) => void;
   onLogout?: () => void;
+  onOpenGitHubModal?: () => void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -34,6 +35,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onDeliverFinalFiles,
   onSelectProject,
   onLogout,
+  onOpenGitHubModal,
 }) => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -158,6 +160,49 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <span>قفل کردن پنل مدیریت</span>
             </button>
           )}
+        </div>
+      </div>
+
+      {/* GitHub 0-100 & APK Build Banner */}
+      <div className="bg-gradient-to-r from-violet-950/60 via-[#160f33] to-[#120a27] border border-violet-500/40 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-violet-600/25 border border-violet-500/50 flex items-center justify-center text-violet-300 shrink-0">
+            <Github className="w-5 h-5 text-violet-400" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-white text-xs sm:text-sm">
+                اتصال مخزن گیت‌هاب و انتشار فایل‌های APK (کافه بازار و گوگل پلی)
+              </h3>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-bold">
+                فعال
+              </span>
+            </div>
+            <p className="text-[11px] text-violet-300/80 mt-0.5 leading-relaxed">
+              آپلود ۰ تا ۱۰۰ تمام فایل‌های پروژه به GitHub، بیلد خودکار با اکشن‌های گیت‌هاب و بسته استاندارد ir.viragraphy.app
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {onOpenGitHubModal && (
+            <button
+              onClick={onOpenGitHubModal}
+              className="flex-1 md:flex-initial px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs shadow-md shadow-violet-600/30 transition flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+            >
+              <UploadCloud className="w-3.5 h-3.5" />
+              <span>مدیریت گیت‌هاب و APK</span>
+            </button>
+          )}
+          <a
+            href="/api/export/project-zip"
+            download="viragraphy-source-code.zip"
+            className="px-3.5 py-2.5 rounded-xl bg-[#0c081c] hover:bg-violet-950/50 border border-violet-700/50 text-violet-200 text-xs font-medium transition flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
+            title="دانلود سورس‌کد کامل پروژه به صورت ZIP"
+          >
+            <FolderArchive className="w-3.5 h-3.5 text-emerald-400" />
+            <span>دانلود ZIP سورس</span>
+          </a>
         </div>
       </div>
 

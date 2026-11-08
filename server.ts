@@ -1,6 +1,11 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import archiver from 'archiver';
+
+const execPromise = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -239,6 +244,126 @@ app.post('/api/customers/sync', (req, res) => {
 
 app.get('/api/customers', (req, res) => {
   res.json({ ok: true, customers: serverCustomers });
+});
+
+// GitHub Integration: Get status
+app.get('/api/github/status', async (req, res) => {
+  try {
+    await execPromise('git config --global --add safe.directory /app/applet');
+    const { stdout: commitInfo } = await execPromise('git log -1 --pretty=format:"%h - %s (%cd)" --date=relative');
+    let remoteUrl = '';
+    try {
+      const { stdout: remote } = await execPromise('git remote get-url origin');
+      // Hide token if embedded
+      remoteUrl = remote.trim().replace(/https:\/\/[^@]+@github\.com\//, 'https://github.com/');
+    } catch {}
+
+    const { stdout: branch } = await execPromise('git branch --show-current');
+
+    return res.json({
+      ok: true,
+      initialized: true,
+      currentBranch: branch.trim() || 'main',
+      latestCommit: commitInfo.trim(),
+      remoteUrl,
+    });
+  } catch (error: any) {
+    return res.json({
+      ok: false,
+      initialized: false,
+      error: error.message,
+    });
+  }
+});
+
+// GitHub Integration: 100% Upload & Push to repository
+app.post('/api/github/push', async (req, res) => {
+  const { repoUrl, token, branch = 'main', commitMessage = 'Full upload: Viragraphy Graphic Platform & Telegram Bot' } = req.body;
+  if (!repoUrl) {
+    return res.status(400).json({ ok: false, error: 'آدرس ریپازیتوری گیت‌هاب (Repository URL) الزامی است.' });
+  }
+
+  try {
+    let cleanUrl = String(repoUrl).trim();
+    if (token && String(token).trim()) {
+      const cleanToken = String(token).trim();
+      if (cleanUrl.startsWith('https://')) {
+        cleanUrl = cleanUrl.replace(/^https:\/\/(?:[^@]+@)?github\.com\//, `https://${cleanToken}@github.com/`);
+      }
+    }
+
+    // Git config & add all
+    await execPromise('git config --global --add safe.directory /app/applet');
+    await execPromise('git config --global user.name "Naser Tavakoli"');
+    await execPromise('git config --global user.email "nasertavakkoliii@gmail.com"');
+
+    // Ensure on branch
+    await execPromise(`git checkout -B ${branch}`);
+    await execPromise('git add .');
+
+    // Commit if changes exist
+    try {
+      const escapedMsg = (commitMessage || 'Full 0-100 Viragraphy upload').replace(/"/g, '\\"');
+      await execPromise(`git commit -m "${escapedMsg}"`);
+    } catch {
+      // Nothing to commit is fine
+    }
+
+    // Reset origin
+    try {
+      await execPromise('git remote remove origin');
+    } catch {}
+    await execPromise(`git remote add origin ${cleanUrl}`);
+
+    // Push with force to ensure complete 0 to 100 upload
+    const { stdout, stderr } = await execPromise(`git push -u origin ${branch} --force`);
+
+    // Get latest commit sha
+    const { stdout: commitSha } = await execPromise('git rev-parse HEAD');
+
+    return res.json({
+      ok: true,
+      message: 'سورس کامل پروژه با موفقیت از ۰ تا ۱۰۰ به گیت‌هاب آپلود شد!',
+      commitSha: commitSha.trim(),
+      branch,
+      output: (stdout + '\n' + stderr).trim(),
+    });
+  } catch (err: any) {
+    console.error('Git push error:', err);
+    return res.status(500).json({
+      ok: false,
+      error: 'خطا در آپلود به گیت‌هاب: ' + (err.message || 'خطای اتصال به گیت‌هاب'),
+      details: err.stderr || err.stdout || '',
+    });
+  }
+});
+
+// Full Project Export as ZIP (Direct 1-click Download)
+app.get('/api/export/project-zip', (req, res) => {
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', 'attachment; filename="viragraphy-source-code.zip"');
+
+  const archive = archiver('zip', {
+    zlib: { level: 9 },
+  });
+
+  archive.on('error', (err) => {
+    console.error('Archiver error:', err);
+    if (!res.headersSent) {
+      res.status(500).send({ error: err.message });
+    }
+  });
+
+  archive.pipe(res);
+
+  // Add all files from root directory, excluding node_modules, build, dist, .git
+  archive.glob('**/*', {
+    cwd: __dirname,
+    ignore: ['node_modules/**', 'dist/**', 'build/**', '.git/**', '.aistudio/**'],
+    dot: true,
+  });
+
+  archive.finalize();
 });
 
 // Telegram Bot Info endpoint
