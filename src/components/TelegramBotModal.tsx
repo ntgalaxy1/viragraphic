@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Send, Bot, Settings, CheckCircle, RefreshCw,
-  Terminal, Smartphone, ExternalLink, AlertCircle, UserCheck, Activity, Sparkles
+  Terminal, Smartphone, ExternalLink, AlertCircle, UserCheck, Activity, Sparkles,
+  Wifi, WifiOff, Globe, Link, Unlink, AlertTriangle, ShieldCheck, Check, Clock, Server
 } from 'lucide-react';
-import { TelegramConfig, Project } from '../types';
+import { TelegramConfig, Project, TelegramConnectivityReport } from '../types';
 import { formatToman, getStatusLabel } from '../utils/formatters';
 import { VIRAGRAPHY_LOGO } from '../data/initialData';
-import { fetchBotInfo, fetchBotUpdates } from '../utils/telegramService';
+import { 
+  fetchBotInfo, 
+  fetchBotUpdates, 
+  checkTelegramConnectivity, 
+  setTelegramWebhook, 
+  deleteTelegramWebhook 
+} from '../utils/telegramService';
 
 interface TelegramBotModalProps {
   config: TelegramConfig;
@@ -67,6 +74,99 @@ export const TelegramBotModal: React.FC<TelegramBotModalProps> = ({
   });
   const [recentUsers, setRecentUsers] = useState<any[]>([]);
   const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
+
+  // Telegram Connectivity & Webhook State
+  const [connectivityReport, setConnectivityReport] = useState<TelegramConnectivityReport | null>(null);
+  const [isCheckingConnectivity, setIsCheckingConnectivity] = useState(false);
+  const [webhookCustomUrl, setWebhookCustomUrl] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}/api/telegram/webhook`;
+    }
+    return '';
+  });
+  const [isSettingWebhook, setIsSettingWebhook] = useState(false);
+  const [isDeletingWebhook, setIsDeletingWebhook] = useState(false);
+  const [webhookFeedback, setWebhookFeedback] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [dropPendingOnSet, setDropPendingOnSet] = useState(false);
+
+  const handleRunConnectivityCheck = async (tokenOverride?: string) => {
+    setIsCheckingConnectivity(true);
+    setWebhookFeedback(null);
+    try {
+      const report = await checkTelegramConnectivity(tokenOverride || botToken);
+      setConnectivityReport(report);
+      if (report.bot) {
+        setBotLiveInfo({
+          isConnected: true,
+          name: report.bot.first_name,
+          username: report.bot.username,
+        });
+      }
+      if (report.webhook?.url) {
+        setWebhookCustomUrl(report.webhook.url);
+      }
+    } catch (err: any) {
+      console.error('Connectivity check error:', err);
+    } finally {
+      setIsCheckingConnectivity(false);
+    }
+  };
+
+  const handleApplyWebhook = async () => {
+    if (!webhookCustomUrl.trim()) return;
+    setIsSettingWebhook(true);
+    setWebhookFeedback(null);
+    try {
+      const res = await setTelegramWebhook(botToken, webhookCustomUrl.trim(), dropPendingOnSet);
+      if (res.ok) {
+        setWebhookFeedback({
+          text: `وب‌هوک با موفقیت روی آدرس ${webhookCustomUrl.trim()} تنظیم و فعال شد.`,
+          type: 'success',
+        });
+        await handleRunConnectivityCheck();
+      } else {
+        setWebhookFeedback({
+          text: `خطا در تنظیم وب‌هوک: ${res.description || res.error || 'پاسخ ناموفق'}`,
+          type: 'error',
+        });
+      }
+    } catch (err: any) {
+      setWebhookFeedback({ text: `خطای شبکه: ${err.message}`, type: 'error' });
+    } finally {
+      setIsSettingWebhook(false);
+    }
+  };
+
+  const handleRemoveWebhook = async () => {
+    setIsDeletingWebhook(true);
+    setWebhookFeedback(null);
+    try {
+      const res = await deleteTelegramWebhook(botToken, dropPendingOnSet);
+      if (res.ok) {
+        setWebhookFeedback({
+          text: 'وب‌هوک با موفقیت حذف شد. دریافت پیام‌ها به حالت خودکار Long Polling بازگشت.',
+          type: 'success',
+        });
+        await handleRunConnectivityCheck();
+      } else {
+        setWebhookFeedback({
+          text: `خطا در حذف وب‌هوک: ${res.description || res.error || 'پاسخ ناموفق'}`,
+          type: 'error',
+        });
+      }
+    } catch (err: any) {
+      setWebhookFeedback({ text: `خطای شبکه: ${err.message}`, type: 'error' });
+    } finally {
+      setIsDeletingWebhook(false);
+    }
+  };
+
+  // Automatically check connectivity when settings tab becomes active
+  useEffect(() => {
+    if (activeTab === 'settings' && !connectivityReport && !isCheckingConnectivity) {
+      handleRunConnectivityCheck();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (botToken) {
@@ -796,82 +896,359 @@ export const TelegramBotModal: React.FC<TelegramBotModalProps> = ({
         </div>
       )}
 
-      {/* TAB 3: Settings */}
+      {/* TAB 3: Settings with Connectivity & Webhook Check */}
       {activeTab === 'settings' && (
-        <form onSubmit={handleSaveSettings} className="max-w-2xl bg-[#110c24] border border-violet-900/40 rounded-2xl p-6 shadow-xl space-y-4 text-xs">
-          <div>
-            <h3 className="text-base font-bold text-white mb-1">پیکربندی توکن بات تلگرام ویراگرافیک</h3>
-            <p className="text-slate-400 text-[11px]">
-              اطلاعات ربات رسمی @Viragraphicbot و مدیر سیستم @Ntgalaxy1
-            </p>
+        <div className="max-w-3xl space-y-6 text-xs">
+          {/* Section 1: Telegram Connectivity & Webhook Diagnostic Tool */}
+          <div className="bg-[#110c24] border border-violet-800/50 rounded-2xl p-5 shadow-2xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-violet-900/40">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-violet-600/20 text-violet-400 border border-violet-500/30">
+                    <Activity className="w-4 h-4" />
+                  </span>
+                  <h3 className="text-sm font-bold text-white">
+                    تست اتصال به Telegram Bot API و وضعیت وب‌هوک
+                  </h3>
+                </div>
+                <p className="text-slate-400 text-[11px]">
+                  بررسی زنده ارتباط با سرورهای رسمی تلگرام، وضعیت گواهی SSL، سلامت تحویل پیام‌ها و وب‌هوک
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleRunConnectivityCheck()}
+                disabled={isCheckingConnectivity}
+                className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:bg-violet-900/50 text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-lg shadow-violet-600/30 cursor-pointer shrink-0"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isCheckingConnectivity ? 'animate-spin' : ''}`} />
+                <span>{isCheckingConnectivity ? 'در حال بررسی اتصال...' : 'تست اتصال و بررسی وب‌هوک'}</span>
+              </button>
+            </div>
+
+            {/* Quick Metrics Bar */}
+            {connectivityReport && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {/* 1. API Status & Latency */}
+                <div className={`p-3 rounded-xl border ${
+                  connectivityReport.ok 
+                    ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300' 
+                    : 'bg-rose-950/30 border-rose-500/40 text-rose-300'
+                }`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] text-slate-400">اتصال سرور تلگرام</span>
+                    {connectivityReport.ok ? <Wifi className="w-3.5 h-3.5 text-emerald-400" /> : <WifiOff className="w-3.5 h-3.5 text-rose-400" />}
+                  </div>
+                  <div className="font-bold text-xs">
+                    {connectivityReport.ok ? 'متصل (Online)' : 'خطای اتصال'}
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                    پینگ: {connectivityReport.latencyMs}ms
+                  </div>
+                </div>
+
+                {/* 2. Bot Identity */}
+                <div className="p-3 rounded-xl bg-[#0c081c] border border-violet-900/40 text-slate-200">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] text-slate-400">شناسه ربات</span>
+                    <Bot className="w-3.5 h-3.5 text-violet-400" />
+                  </div>
+                  <div className="font-bold text-xs truncate dir-ltr text-right">
+                    {connectivityReport.bot?.username ? `@${connectivityReport.bot.username}` : (botUsername || 'ثبت‌نشده')}
+                  </div>
+                  <div className="text-[10px] text-slate-400 truncate">
+                    {connectivityReport.bot?.first_name || 'ربات تلگرام'}
+                  </div>
+                </div>
+
+                {/* 3. Reception Mode */}
+                <div className="p-3 rounded-xl bg-[#0c081c] border border-violet-900/40 text-slate-200">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] text-slate-400">روش دریافت آپدیت‌ها</span>
+                    <Globe className="w-3.5 h-3.5 text-violet-400" />
+                  </div>
+                  <div className="font-bold text-xs">
+                    {connectivityReport.mode === 'webhook' ? (
+                      <span className="text-emerald-400 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        وب‌هوک (Webhook)
+                      </span>
+                    ) : (
+                      <span className="text-cyan-400 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                        Long Polling خودکار
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">
+                    {connectivityReport.mode === 'webhook' ? 'دریافت Real-time' : 'واکشی خودکار سرور'}
+                  </div>
+                </div>
+
+                {/* 4. Pending Updates */}
+                <div className={`p-3 rounded-xl border ${
+                  (connectivityReport.webhook?.pendingUpdateCount ?? 0) > 10
+                    ? 'bg-amber-950/30 border-amber-500/40 text-amber-300'
+                    : 'bg-[#0c081c] border-violet-900/40 text-slate-200'
+                }`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] text-slate-400">صف پیام‌های معلق</span>
+                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  </div>
+                  <div className="font-bold text-xs font-mono">
+                    {connectivityReport.webhook?.pendingUpdateCount ?? 0} پیام
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">
+                    {(connectivityReport.webhook?.pendingUpdateCount ?? 0) === 0 ? 'صف پردازش خالی است' : 'در انتظار دریافت'}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Detailed Diagnostic Checklist */}
+            {connectivityReport && connectivityReport.diagnostics && (
+              <div className="space-y-2 pt-1">
+                <div className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-violet-400" />
+                  <span>چک‌لیست سلامت سرویس و وب‌هوک تلگرام:</span>
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  {connectivityReport.diagnostics.map((diag) => {
+                    const isPass = diag.status === 'pass';
+                    const isWarning = diag.status === 'warning';
+                    const isFail = diag.status === 'fail';
+
+                    return (
+                      <div
+                        key={diag.id || diag.name}
+                        className={`p-3 rounded-xl border flex items-start justify-between gap-3 ${
+                          isPass
+                            ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200'
+                            : isWarning
+                            ? 'bg-amber-950/20 border-amber-500/30 text-amber-200'
+                            : isFail
+                            ? 'bg-rose-950/20 border-rose-500/30 text-rose-200'
+                            : 'bg-[#0c081c] border-violet-900/40 text-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2.5">
+                          <span className="mt-0.5 shrink-0">
+                            {isPass ? (
+                              <CheckCircle className="w-4 h-4 text-emerald-400" />
+                            ) : isWarning ? (
+                              <AlertTriangle className="w-4 h-4 text-amber-400" />
+                            ) : isFail ? (
+                              <AlertCircle className="w-4 h-4 text-rose-400" />
+                            ) : (
+                              <Activity className="w-4 h-4 text-slate-400" />
+                            )}
+                          </span>
+                          <div>
+                            <span className="font-semibold block text-white text-xs">{diag.name}</span>
+                            <span className="text-[11px] text-slate-300 leading-relaxed block mt-0.5">{diag.detail}</span>
+                          </div>
+                        </div>
+
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded shrink-0 ${
+                          isPass
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : isWarning
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            : isFail
+                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                            : 'bg-slate-800 text-slate-300'
+                        }`}>
+                          {isPass ? 'تأیید شد' : isWarning ? 'هشدار' : isFail ? 'خطا' : 'اطلاع'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Webhook Configuration & Management Tool */}
+            <div className="pt-3 border-t border-violet-900/40 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-bold text-white text-xs">
+                  <Link className="w-4 h-4 text-violet-400" />
+                  <span>تنظیم و پیکربندی آدرس وب‌هوک (Telegram Webhook Configuration)</span>
+                </div>
+                {connectivityReport?.webhook?.url ? (
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono">
+                    وب‌هوک فعال است
+                  </span>
+                ) : (
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-mono">
+                    حالت Long Polling فعال است
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-slate-300 text-[11px]">
+                  <span>آدرس Endpoint وب‌هوک تلگرام (HTTPS URL):</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof window !== 'undefined') {
+                        setWebhookCustomUrl(`${window.location.origin}/api/telegram/webhook`);
+                      }
+                    }}
+                    className="text-[10px] text-violet-400 hover:text-violet-300 underline cursor-pointer"
+                  >
+                    درج آدرس وب‌هوک پیش‌فرض سرور فعلی
+                  </button>
+                </div>
+                <input
+                  type="url"
+                  value={webhookCustomUrl}
+                  onChange={(e) => setWebhookCustomUrl(e.target.value)}
+                  placeholder="https://your-domain.com/api/telegram/webhook"
+                  dir="ltr"
+                  className="w-full bg-[#0c081c] border border-violet-900/50 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs focus:outline-hidden focus:border-violet-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#0c081c]/80 border border-violet-900/30">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="dropPendingChk"
+                    checked={dropPendingOnSet}
+                    onChange={(e) => setDropPendingOnSet(e.target.checked)}
+                    className="w-4 h-4 accent-violet-600 rounded"
+                  />
+                  <label htmlFor="dropPendingChk" className="text-slate-300 text-[11px] cursor-pointer">
+                    پاک‌سازی پیام‌های انباشته‌شده در صف تلگرام (Drop Pending Updates)
+                  </label>
+                </div>
+                <span className="text-[10px] text-slate-500">برای رفع تداخل‌های صف مفید است</span>
+              </div>
+
+              {webhookFeedback && (
+                <div className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+                  webhookFeedback.type === 'success'
+                    ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
+                    : 'bg-rose-950/60 border-rose-500/40 text-rose-300'
+                }`}>
+                  {webhookFeedback.type === 'success' ? (
+                    <CheckCircle className="w-4 h-4 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                  )}
+                  <span>{webhookFeedback.text}</span>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={handleApplyWebhook}
+                  disabled={isSettingWebhook || !webhookCustomUrl.trim()}
+                  className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:bg-violet-900/40 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow"
+                >
+                  <Link className="w-3.5 h-3.5" />
+                  <span>{isSettingWebhook ? 'در حال ثبت...' : 'تنظیم و فعال‌سازی وب‌هوک (Set Webhook)'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleRemoveWebhook}
+                  disabled={isDeletingWebhook}
+                  className="px-4 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-500/40 text-rose-200 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Unlink className="w-3.5 h-3.5" />
+                  <span>{isDeletingWebhook ? 'در حال حذف...' : 'حذف وب‌هوک (بازگشت به Long Polling)'}</span>
+                </button>
+              </div>
+
+              {/* Informative Guidance */}
+              <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800 text-[11px] text-slate-400 space-y-1 leading-relaxed">
+                <p>
+                  💡 <strong>راهنما:</strong> در پلتفرم تلگرام، زمانی که وب‌هوک فعال است، پیام‌ها به صورت Real-time مستقیماً به آدرس Endpoint سرور فرستاده می‌شوند. چنانچه وب‌هوک تنظیم نشده باشد، سرور با قابلیت Long Polling هوشمند پیام‌ها را دریافت و فوروارد می‌کند. در هر دو حالت، سیستم سفارشات و پاسخگویی خودکار فعال خواهد بود.
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-slate-300 font-semibold mb-1">توکن بات تلگرام (Bot Token):</label>
-            <input
-              type="text"
-              value={botToken}
-              onChange={(e) => setBotToken(e.target.value)}
-              dir="ltr"
-              className="w-full bg-[#0c081c] border border-violet-900/40 rounded-xl px-3.5 py-2.5 text-white font-mono focus:outline-hidden focus:border-violet-500"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Section 2: Standard Bot Credentials Form */}
+          <form onSubmit={handleSaveSettings} className="bg-[#110c24] border border-violet-900/40 rounded-2xl p-6 shadow-xl space-y-4">
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">نام کاربری بات (Bot Username):</label>
+              <h3 className="text-base font-bold text-white mb-1">پیکربندی توکن بات تلگرام ویراگرافیک</h3>
+              <p className="text-slate-400 text-[11px]">
+                اطلاعات ربات رسمی @Viragraphicbot و مدیر سیستم @Ntgalaxy1
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">توکن بات تلگرام (Bot Token):</label>
               <input
                 type="text"
-                value={botUsername}
-                onChange={(e) => setBotUsername(e.target.value)}
+                value={botToken}
+                onChange={(e) => setBotToken(e.target.value)}
                 dir="ltr"
                 className="w-full bg-[#0c081c] border border-violet-900/40 rounded-xl px-3.5 py-2.5 text-white font-mono focus:outline-hidden focus:border-violet-500"
               />
             </div>
 
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">آیدی مدیر جهت دریافت سفارشات:</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">نام کاربری بات (Bot Username):</label>
+                <input
+                  type="text"
+                  value={botUsername}
+                  onChange={(e) => setBotUsername(e.target.value)}
+                  dir="ltr"
+                  className="w-full bg-[#0c081c] border border-violet-900/40 rounded-xl px-3.5 py-2.5 text-white font-mono focus:outline-hidden focus:border-violet-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">آیدی مدیر جهت دریافت سفارشات:</label>
+                <input
+                  type="text"
+                  value={adminChatId}
+                  onChange={(e) => setAdminChatId(e.target.value)}
+                  dir="ltr"
+                  className="w-full bg-[#0c081c] border border-violet-900/40 rounded-xl px-3.5 py-2.5 text-white font-mono focus:outline-hidden focus:border-violet-500"
+                />
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-[#0c081c] border border-violet-900/40 flex items-center justify-between">
+              <div>
+                <span className="font-semibold text-white block">حالت شبیه‌سازی هوشمند</span>
+                <span className="text-[10px] text-slate-400">
+                  در صورت غیرفعال بودن (توصیه شده)، پیام‌ها به صورت زنده از طریق سرور به تلگرام کاربر ارسال می‌شوند.
+                </span>
+              </div>
               <input
-                type="text"
-                value={adminChatId}
-                onChange={(e) => setAdminChatId(e.target.value)}
-                dir="ltr"
-                className="w-full bg-[#0c081c] border border-violet-900/40 rounded-xl px-3.5 py-2.5 text-white font-mono focus:outline-hidden focus:border-violet-500"
+                type="checkbox"
+                checked={isSimulated}
+                onChange={(e) => setIsSimulated(e.target.checked)}
+                className="w-4 h-4 accent-violet-600 rounded"
               />
             </div>
-          </div>
 
-          <div className="p-3.5 rounded-xl bg-[#0c081c] border border-violet-900/40 flex items-center justify-between">
-            <div>
-              <span className="font-semibold text-white block">حالت شبیه‌سازی هوشمند</span>
-              <span className="text-[10px] text-slate-400">
-                در صورت غیرفعال بودن (توصیه شده)، پیام‌ها به صورت زنده از طریق سرور به تلگرام کاربر ارسال می‌شوند.
-              </span>
+            {saveSuccess && (
+              <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" />
+                <span>تنظیمات ربات تلگرام با موفقیت ذخیره شد.</span>
+              </div>
+            )}
+
+            <div className="pt-2">
+              <button
+                type="submit"
+                className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs shadow-md shadow-violet-600/30 transition cursor-pointer"
+              >
+                ذخیره تنظیمات تلگرام
+              </button>
             </div>
-            <input
-              type="checkbox"
-              checked={isSimulated}
-              onChange={(e) => setIsSimulated(e.target.checked)}
-              className="w-4 h-4 accent-violet-600 rounded"
-            />
-          </div>
-
-          {saveSuccess && (
-            <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2">
-              <CheckCircle className="w-4 h-4" />
-              <span>تنظیمات ربات تلگرام با موفقیت ذخیره شد.</span>
-            </div>
-          )}
-
-          <div className="pt-2">
-            <button
-              type="submit"
-              className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs shadow-md shadow-violet-600/30 transition"
-            >
-              ذخیره تنظیمات تلگرام
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       )}
     </div>
   );

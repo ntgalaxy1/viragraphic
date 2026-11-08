@@ -165,3 +165,41 @@ export interface UserProfile {
   isRegistered?: boolean;        // آیا ثبت‌نام مشتری تکمیل شده است
   role: 'customer' | 'admin';
 }
+
+export interface TelegramWebhookInfo {
+  url: string;
+  hasCustomCertificate: boolean;
+  pendingUpdateCount: number;
+  lastErrorDate: number | null;
+  lastErrorMessage: string | null;
+  lastSyncErrorDate?: number | null;
+  maxConnections?: number;
+  ipAddress?: string | null;
+}
+
+export interface TelegramConnectivityDiagnostic {
+  id: string;
+  name: string;
+  status: 'pass' | 'warning' | 'fail' | 'info' | 'skipped';
+  detail: string;
+}
+
+export interface TelegramConnectivityReport {
+  ok: boolean;
+  latencyMs: number;
+  timestamp: string;
+  error?: string;
+  errorCode?: number;
+  bot?: {
+    id: number;
+    is_bot: boolean;
+    first_name: string;
+    username: string;
+    can_join_groups?: boolean;
+    can_read_all_group_messages?: boolean;
+    supports_inline_queries?: boolean;
+  } | null;
+  webhook?: TelegramWebhookInfo | null;
+  mode?: 'webhook' | 'polling' | 'none';
+  diagnostics: TelegramConnectivityDiagnostic[];
+}

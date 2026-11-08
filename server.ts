@@ -431,6 +431,183 @@ app.post('/api/telegram/send', async (req, res) => {
   }
 });
 
+// Telegram API Connectivity & Webhook Diagnostic Endpoint
+app.get('/api/telegram/check-connectivity', async (req, res) => {
+  const token = ((req.query.token as string) || BOT_TOKEN).trim();
+  const startTime = Date.now();
+
+  try {
+    // Step 1: Verify Telegram Bot API Reachability & Token Validity (getMe)
+    const meRes = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+    const latencyMs = Date.now() - startTime;
+    const meData = await meRes.json();
+
+    if (!meData.ok) {
+      return res.json({
+        ok: false,
+        latencyMs,
+        timestamp: new Date().toISOString(),
+        error: meData.description || 'توکن ربات نامعتبر است یا ارتباط با سرور تلگرام برقرار نشد.',
+        errorCode: meData.error_code,
+        bot: null,
+        webhook: null,
+        mode: 'none',
+        diagnostics: [
+          {
+            id: 'api_connection',
+            name: 'اتصال فیزیکی به api.telegram.org',
+            status: 'pass',
+            detail: `پاسخ شبکه در ${latencyMs} میلی‌ثانیه دریافت شد.`
+          },
+          {
+            id: 'bot_auth',
+            name: 'احراز هویت توکن ربات تلگرام',
+            status: 'fail',
+            detail: meData.description || 'توکن نامعتبر است یا ابطال گردیده است.'
+          },
+          {
+            id: 'webhook_status',
+            name: 'بررسی وضعیت وب‌هوک',
+            status: 'skipped',
+            detail: 'به دلیل عدم اعتبارسنجی توکن، بررسی وب‌هوک انجام نشد.'
+          }
+        ]
+      });
+    }
+
+    // Step 2: Fetch Webhook Status (getWebhookInfo)
+    const hookRes = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`);
+    const hookData = await hookRes.json();
+    const webhookInfo = hookData.result || {};
+
+    const hasWebhook = Boolean(webhookInfo.url && webhookInfo.url.length > 0);
+    const hasError = Boolean(webhookInfo.last_error_message);
+    const pendingCount = typeof webhookInfo.pending_update_count === 'number' ? webhookInfo.pending_update_count : 0;
+
+    const diagnostics = [
+      {
+        id: 'api_connection',
+        name: 'ارتباط زنده با Telegram Bot API',
+        status: latencyMs < 800 ? 'pass' : 'warning',
+        detail: `پاسخ در ${latencyMs}ms با موفقیت دریافت شد.`
+      },
+      {
+        id: 'bot_auth',
+        name: 'اعتبارسنجی توکن و مشخصات ربات',
+        status: 'pass',
+        detail: `@${meData.result.username} (${meData.result.first_name || 'ربات ویراگرافیک'}) [شناسه: ${meData.result.id}]`
+      },
+      {
+        id: 'webhook_status',
+        name: 'پیکربندی آدرس وب‌هوک (Webhook URL)',
+        status: hasWebhook ? 'pass' : 'info',
+        detail: hasWebhook
+          ? `وب‌هوک فعال روی: ${webhookInfo.url}`
+          : 'وب‌هوکی تنظیم نشده است (دریافت پیام‌ها با Long Polling خودکار انجام می‌شود)'
+      },
+      {
+        id: 'webhook_health',
+        name: 'سلامت تحویل و هشدارهای وب‌هوک',
+        status: hasError ? 'fail' : 'pass',
+        detail: hasError
+          ? `خطای ثبت‌شده در تلگرام: ${webhookInfo.last_error_message} (${webhookInfo.last_error_date ? new Date(webhookInfo.last_error_date * 1000).toLocaleString('fa-IR') : ''})`
+          : 'هیچ خطایی در تحویل وب‌هوک ثبت نشده است (کاملاً سالم و پایدار)'
+      },
+      {
+        id: 'pending_updates',
+        name: 'صف پیام‌های معلق (Pending Updates)',
+        status: pendingCount > 25 ? 'warning' : 'pass',
+        detail: `${pendingCount} پیام در صف انتظار سرور تلگرام`
+      }
+    ];
+
+    return res.json({
+      ok: true,
+      latencyMs,
+      timestamp: new Date().toISOString(),
+      bot: meData.result,
+      webhook: {
+        url: webhookInfo.url || '',
+        hasCustomCertificate: Boolean(webhookInfo.has_custom_certificate),
+        pendingUpdateCount: pendingCount,
+        lastErrorDate: webhookInfo.last_error_date || null,
+        lastErrorMessage: webhookInfo.last_error_message || null,
+        lastSyncErrorDate: webhookInfo.last_synchronization_error_date || null,
+        maxConnections: webhookInfo.max_connections || 40,
+        ipAddress: webhookInfo.ip_address || null,
+      },
+      mode: hasWebhook ? 'webhook' : 'polling',
+      diagnostics
+    });
+  } catch (err: any) {
+    const latencyMs = Date.now() - startTime;
+    return res.status(500).json({
+      ok: false,
+      latencyMs,
+      timestamp: new Date().toISOString(),
+      error: `عدم امکان برقراری ارتباط با api.telegram.org: ${err.message}`,
+      bot: null,
+      webhook: null,
+      mode: 'none',
+      diagnostics: [
+        {
+          id: 'api_connection',
+          name: 'اتصال به سرورهای تلگرام',
+          status: 'fail',
+          detail: `خطای اتصال شبکه: ${err.message}`
+        }
+      ]
+    });
+  }
+});
+
+// Set Telegram Webhook
+app.post('/api/telegram/webhook/set', async (req, res) => {
+  const { token = BOT_TOKEN, url, drop_pending_updates = false, secret_token } = req.body;
+  if (!url || typeof url !== 'string') {
+    return res.status(400).json({ ok: false, error: 'آدرس URL وب‌هوک الزامی است.' });
+  }
+
+  try {
+    const payload: any = {
+      url: url.trim(),
+      drop_pending_updates: Boolean(drop_pending_updates),
+    };
+    if (secret_token) payload.secret_token = secret_token;
+
+    const response = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+    return res.json(data);
+  } catch (error: any) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+// Delete Telegram Webhook
+app.post('/api/telegram/webhook/delete', async (req, res) => {
+  const { token = BOT_TOKEN, drop_pending_updates = false } = req.body;
+
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${token}/deleteWebhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        drop_pending_updates: Boolean(drop_pending_updates),
+      }),
+    });
+
+    const data = await response.json();
+    return res.json(data);
+  } catch (error: any) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
 // ----------------------------------------------------
 // Automated Telegram Bot Engine
 // ----------------------------------------------------
@@ -1049,6 +1226,26 @@ async function handleTelegramCallbackQuery(callbackQuery: any) {
   }
 }
 
+// Telegram Webhook updates receiver endpoint
+app.post('/api/telegram/webhook', async (req, res) => {
+  const update = req.body;
+  if (update && typeof update === 'object') {
+    if (update.update_id) {
+      lastUpdateId = Math.max(lastUpdateId, update.update_id);
+    }
+    if (update.message) {
+      handleTelegramMessage(update.message).catch((err) =>
+        console.error('Webhook error processing message:', err)
+      );
+    } else if (update.callback_query) {
+      handleTelegramCallbackQuery(update.callback_query).catch((err) =>
+        console.error('Webhook error processing callback query:', err)
+      );
+    }
+  }
+  return res.status(200).json({ ok: true });
+});
+
 async function pollTelegramUpdates() {
   if (isPolling) return;
   isPolling = true;
@@ -1068,12 +1265,16 @@ async function pollTelegramUpdates() {
           await handleTelegramCallbackQuery(update.callback_query);
         }
       }
+    } else if (!data.ok && data.error_code === 409) {
+      // Conflict: Webhook is currently active on Telegram server, so getUpdates cannot run.
+      // Wait for 15 seconds before next polling check to avoid rapid error loops.
+      await new Promise((r) => setTimeout(r, 15000));
     }
   } catch (err) {
     // transient backoff
   } finally {
     isPolling = false;
-    setTimeout(pollTelegramUpdates, 1200);
+    setTimeout(pollTelegramUpdates, 1500);
   }
 }
 

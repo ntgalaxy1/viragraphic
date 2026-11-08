@@ -1,4 +1,4 @@
-import { TelegramConfig } from '../types';
+import { TelegramConfig, TelegramConnectivityReport } from '../types';
 import { getCurrentShamsiDateTime } from './formatters';
 
 export interface SendTelegramResult {
@@ -123,5 +123,73 @@ export async function fetchBotUpdates(token: string) {
     return await res.json();
   } catch (err) {
     return { ok: false, error: 'Failed to fetch bot updates' };
+  }
+}
+
+export async function checkTelegramConnectivity(token?: string): Promise<TelegramConnectivityReport> {
+  try {
+    const query = token ? `?token=${encodeURIComponent(token.trim())}` : '';
+    const res = await fetch(`/api/telegram/check-connectivity${query}`);
+    return await res.json();
+  } catch (err: any) {
+    return {
+      ok: false,
+      latencyMs: 0,
+      timestamp: new Date().toISOString(),
+      error: err.message || 'خطای شبکه در بررسی اتصال تلگرام',
+      bot: null,
+      webhook: null,
+      mode: 'none',
+      diagnostics: [
+        {
+          id: 'api_connection',
+          name: 'اتصال به سرورهای تلگرام',
+          status: 'fail',
+          detail: err.message || 'عدم دسترسی به سرور API تلگرام',
+        },
+      ],
+    };
+  }
+}
+
+export async function setTelegramWebhook(
+  token: string,
+  url: string,
+  dropPendingUpdates = false,
+  secretToken?: string
+): Promise<{ ok: boolean; description?: string; error?: string }> {
+  try {
+    const res = await fetch('/api/telegram/webhook/set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: token.trim(),
+        url: url.trim(),
+        drop_pending_updates: dropPendingUpdates,
+        secret_token: secretToken?.trim(),
+      }),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { ok: false, error: err.message || 'خطا در ثبت وب‌هوک' };
+  }
+}
+
+export async function deleteTelegramWebhook(
+  token: string,
+  dropPendingUpdates = false
+): Promise<{ ok: boolean; description?: string; error?: string }> {
+  try {
+    const res = await fetch('/api/telegram/webhook/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: token.trim(),
+        drop_pending_updates: dropPendingUpdates,
+      }),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { ok: false, error: err.message || 'خطا در حذف وب‌هوک' };
   }
 }
