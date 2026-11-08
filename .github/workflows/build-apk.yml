@@ -34,41 +34,31 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.5
 
       - name: Copy Built Web Assets to Android Assets
         run: |
           mkdir -p android/app/src/main/assets/public
           cp -r dist/* android/app/src/main/assets/public/
 
-      - name: Generate Gradle Wrapper
+      - name: Build Android APK with Gradle
         run: |
           cd android
-          gradle wrapper
-
-      - name: Build Release & Debug APKs with Gradle
-        run: |
-          cd android
-          ./gradlew assembleDebug --stacktrace
-          ./gradlew assembleRelease --stacktrace || true
-
-      - name: Build Android App Bundle (AAB for Google Play)
-        run: |
-          cd android
-          ./gradlew bundleDebug --stacktrace || true
-          ./gradlew bundleRelease --stacktrace || true
+          gradle assembleDebug --no-daemon --stacktrace
 
       - name: Prepare Output Files for Release
         run: |
           mkdir -p release-files
-          # Copy APK
-          find android/app/build/outputs/apk -name "*.apk" -exec cp {} release-files/viragraphy-release.apk \; || true
-          # Copy AAB
-          find android/app/build/outputs/bundle -name "*.aab" -exec cp {} release-files/viragraphy-release.aab \; || true
+          # Copy compiled APK
+          if [ -f android/app/build/outputs/apk/debug/app-debug.apk ]; then
+            cp android/app/build/outputs/apk/debug/app-debug.apk release-files/viragraphy-release.apk
+            cp android/app/build/outputs/apk/debug/app-debug.apk release-files/viragraphy-bazaar.apk
+          else
+            find android/app/build/outputs/apk -name "*.apk" -exec cp {} release-files/viragraphy-release.apk \;
+          fi
           # Copy metadata assets
           cp public/assets/aistudio/IMG_20260627_085532_572_246980ce.jpg release-files/icon-512x512.png || true
           cp public/.well-known/assetlinks.json release-files/assetlinks.json || true
@@ -76,10 +66,10 @@ jobs:
           cp GOOGLE_PLAY_PUBLISH_GUIDE.md release-files/ || true
           ls -la release-files/
 
-      - name: Upload APK & AAB Artifacts
+      - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: viragraphy-android-release
+          name: viragraphy-android-apk
           path: release-files/*
           retention-days: 30
 
@@ -94,8 +84,10 @@ jobs:
             
             این بسته شامل کلیه فایل‌های لازم جهت انتشار در استورهای **کافه بازار** و **گوگل پلی** است:
             
-            * 📱 **viragraphy-release.apk**: فایل نصبی برای گوشی و پنل توسعه‌دهندگان کافه بازار
-            * 📦 **viragraphy-release.aab**: بسته رسمی Android App Bundle برای گوگل پلی کنسول
+            * 📱 **viragraphy-release.apk**: فایل نصبی اصلی برای گوشی و پنل توسعه‌دهندگان کافه بازار
+            * 📱 **viragraphy-bazaar.apk**: نسخه آماده انتشار ویژه کافه بازار
+            * 📦 **viragraphy-android-project.zip**: پروژه کامل اندروید استودیو
+            * 📦 **viragraphy-source-code.zip**: سورس کامل پروژه
             * 🖼️ **icon-512x512.png**: آیکون رسمی با وضوح بالا ۵۱۲×۵۱۲ پیکسل
             * 🔗 **assetlinks.json**: فایل تأییدیه دامنه Digital Asset Links
             * 📘 **راهنماها**: راهنمای فارسی انتشار در بازار و گوگل پلی
@@ -106,8 +98,8 @@ jobs:
             * Min SDK: `21`
             * Version: `1.0.0 (Code 1)`
           files: |
+            release-files/viragraphy-release.apk
+            release-files/viragraphy-bazaar.apk
             release-files/*
-            viragraphy-source-code.zip
-            viragraphy-android-project.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
